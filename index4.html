@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CasinoX | MASTER ADMIN</title>
+    <style>
+        :root { --bg: #0b0c0d; --card: #1b1c1d; --accent: #d91d3a; --success: #28a745; --gold: #f1c40f; --text: #9ea0a3; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; padding-bottom: 80px; }
+        .header { padding: 20px; background: var(--card); border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .card { background: var(--card); border-radius: 12px; padding: 15px; border: 1px solid #333; margin: 15px; }
+        
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .stat-box { background: #000; padding: 15px; border-radius: 10px; border: 1px solid #222; text-align: center; }
+        .stat-val { display: block; font-size: 1.2rem; font-weight: 900; color: var(--gold); }
+        .stat-lbl { font-size: 0.7rem; color: var(--text); text-transform: uppercase; }
+
+        /* LIVE TRACKER CSS */
+        .live-round-bar { background: #000; padding: 12px; border-radius: 10px; margin-bottom: 10px; border-left: 4px solid var(--accent); display: flex; justify-content: space-around; text-align: center; }
+        .live-round-bar small { font-size: 0.6rem; color: var(--text); display: block; margin-bottom: 4px; }
+        .live-round-bar b { font-size: 0.9rem; }
+
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; margin-bottom: 5px; }
+        .btn-green { background: var(--success); } .btn-red { background: var(--accent); } .btn-blue { background: #3498db; } .btn-gray { background: #444; }
+        
+        .list-item { background: #000; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #222; font-size: 0.85rem; }
+        textarea { width: 100%; height: 100px; background: #000; color: #0f0; border: 1px solid #444; border-radius: 8px; padding: 10px; margin-top: 10px; font-family: monospace; }
+
+        nav { position: fixed; bottom: 0; width: 100%; background: #111; display: flex; border-top: 1px solid #333; height: 70px; z-index: 100; }
+        nav div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--text); font-weight: bold; cursor: pointer; }
+        nav div.active { color: var(--gold); background: #1a1a1a; }
+
+        .page { display: none; }
+        .page.active { display: block; }
+        .user-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px; }
+        .live-display { font-size: 3.5rem; font-weight: 900; text-align: center; margin: 10px 0; color: white; letter-spacing: -2px; }
+        .banned { border: 2px solid var(--accent) !important; opacity: 0.6; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2 style="margin:0; color:var(--accent);">CASINOX</h2>
+        <div style="display:flex; align-items:center; gap:5px;">
+            <div id="admin-purse" style="background:var(--gold); color:#000; padding:8px 12px; border-radius:8px; font-weight:900; font-size:0.9rem;">
+                ₦0.00
+            </div>
+            <button onclick="resetPurse()" style="background:#333; border:none; color:#fff; border-radius:5px; padding:5px 8px; font-size:10px;">RESET</button>
+        </div>
+    </div>
+
+    <div id="p-game" class="page active">
+        <div class="card" style="margin-bottom:0;">
+            <div class="live-round-bar">
+                <div><small>PLAYERS</small><b id="live-p-count">0</b></div>
+                <div><small>TOTAL BET</small><b id="live-p-bet" style="color:var(--gold)">₦0</b></div>
+                <div><small>CASHED OUT</small><b id="live-p-win" style="color:var(--success)">₦0</b></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 id="engine-status" style="color: var(--accent); font-size: 1rem;">● Engine Offline</h2>
+            <div id="live-multi" class="live-display">1.00x</div>
+            <div id="status-text" style="text-align:center; font-size:0.8rem; color:var(--gold); margin-bottom:15px; font-weight: bold;">READY</div>
+            
+            <button class="btn btn-green" id="engine-btn" onclick="toggleEngine()">START GLOBAL ENGINE</button>
+            
+            <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; margin-top:10px; font-size:0.85rem;">
+                <b>Round Progress:</b> <span id="idx-view" style="color:var(--gold)">0 of 0</span><br>
+                <b>Upcoming Crash:</b> <span id="next-view" style="color:var(--gold)">0.00x</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Round Management</h3>
+            <button class="btn btn-blue" style="padding:10px; font-size:0.7rem;" onclick="generateAutoSequence()">AUTO-GENERATE 50 ROUNDS</button>
+            <textarea id="seq-input" placeholder="Paste multipliers separated by commas..."></textarea>
+            <button class="btn btn-red" onclick="saveSequence()" style="margin-top:10px;">Apply This Sequence</button>
+        </div>
+    </div>
+
+    <div id="p-trans" class="page">
+        <div class="card">
+            <h3>Pending Requests</h3>
+            <div id="trans-list"></div>
+        </div>
+    </div>
+
+    <div id="p-users" class="page">
+        <div class="card">
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span id="total-users" class="stat-val">0</span>
+                    <span class="stat-lbl">Accounts</span>
+                </div>
+                <div class="stat-box">
+                    <span id="total-funds" class="stat-val">₦0</span>
+                    <span class="stat-lbl">Total Funds</span>
+                </div>
+            </div>
+            <h3>User Database</h3>
+            <div id="user-list"></div>
+        </div>
+    </div>
+
+    <nav>
+        <div onclick="showPage('game')" id="n-game" class="active">ENGINE</div>
+        <div onclick="showPage('trans')" id="n-trans">MONEY</div>
+        <div onclick="showPage('users')" id="n-users">USERS</div>
+    </nav>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc, collection, addDoc, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDqzcbag9LItdJQ_7wMxxGA_iC497xCfxQ",
+  authDomain: "casinoxfiresocket1.firebaseapp.com",
+  projectId: "casinoxfiresocket1",
+  storageBucket: "casinoxfiresocket1.firebasestorage.app",
+  messagingSenderId: "336466970636",
+  appId: "1:336466970636:web:f16d686d3d38fcc10b8629"
+};
+
+const fb = initializeApp(firebaseConfig);
+const db = getFirestore(fb);
+
+let engineRunning = false;
+let globalInterval = null;
+
+// Real-time round variables
+let roundTotalBetted = 0;
+let roundTotalCashed = 0;
+let currentPurse = 0;
+
+window.showPage = (p) => {
+    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('nav div').forEach(el => el.classList.remove('active'));
+    document.getElementById('p-'+p).classList.add('active');
+    document.getElementById('n-'+p).classList.add('active');
+};
+
+// LIVE STATS TRACKER
+onSnapshot(collection(db, "active_bets"), snap => {
+    let bets = 0; let wins = 0; let count = 0;
+    snap.forEach(d => {
+        const data = d.data();
+        bets += data.amount || 0;
+        wins += data.winAmount || 0;
+        count++;
+    });
+    roundTotalBetted = bets;
+    roundTotalCashed = wins;
+    document.getElementById('live-p-count').innerText = count;
+    document.getElementById('live-p-bet').innerText = "₦" + bets.toLocaleString();
+    document.getElementById('live-p-win').innerText = "₦" + wins.toLocaleString();
+});
+
+// PURSE & STATE SYNC
+onSnapshot(doc(db, "game", "live_state"), snap => {
+    const data = snap.data(); if(!data) return;
+    currentPurse = data.purse || 0;
+    document.getElementById('admin-purse').innerText = "₦" + currentPurse.toLocaleString(undefined, {minimumFractionDigits: 2});
+    
+    const multiEl = document.getElementById('live-multi');
+    const statusEl = document.getElementById('status-text');
+    
+    if(data.status === 'waiting') {
+        multiEl.innerText = "1.00x"; multiEl.style.color = "white";
+        statusEl.innerText = "WAITING FOR NEXT ROUND...";
+    } else if(data.status === 'flying') {
+        statusEl.innerText = "ROUND IN PROGRESS";
+        multiEl.innerText = (data.current || 1.00).toFixed(2) + "x";
+    } else if(data.status === 'crashed') {
+        multiEl.innerText = data.target.toFixed(2) + "x";
+        multiEl.style.color = "var(--accent)";
+        statusEl.innerText = "FLEW AWAY!";
+    }
+});
+
+window.toggleEngine = async () => {
+    engineRunning = !engineRunning;
+    const btn = document.getElementById('engine-btn');
+    const status = document.getElementById('engine-status');
+    if (engineRunning) {
+        btn.innerText = "STOP ENGINE"; btn.className = "btn btn-red"; 
+        status.innerText = "● Engine Live"; status.style.color = "var(--success)";
+        runCycle();
+    } else {
+        btn.innerText = "START ENGINE"; btn.className = "btn btn-green"; 
+        status.innerText = "● Engine Offline"; status.style.color = "var(--accent)";
+        clearInterval(globalInterval);
+    }
+};
+
+async function runCycle() {
+    if (!engineRunning) return;
+    
+    const seqSnap = await getDoc(doc(db, "game", "aviator_sequence"));
+    const d = seqSnap.data(); 
+    const target = d.multipliers[d.currentIndex % d.multipliers.length];
+    
+    // Clear old round bets
+    const oldBets = await getDocs(collection(db, "active_bets"));
+    for(const b of oldBets.docs) { await deleteDoc(doc(db, "active_bets", b.id)); }
+
+    await setDoc(doc(db, "game", "live_state"), { 
+        status: "waiting", 
+        timer: 5.0,
+        target, 
+        current: 1.0,
+        purse: currentPurse 
+    });
+
+    setTimeout(async () => {
+        if (!engineRunning) return;
+        await updateDoc(doc(db, "game", "live_state"), { status: "flying" });
+        
+        let m = 1.0;
+        globalInterval = setInterval(async () => {
+            if (!engineRunning) { clearInterval(globalInterval); return; }
+            m += 0.01 + (m / 100); 
+            
+            if (m >= target) {
+                clearInterval(globalInterval);
+                
+                // FINAL PURSE CALCULATION
+                const roundProfit = roundTotalBetted - roundTotalCashed;
+                const newPurse = currentPurse + roundProfit;
+
+                await updateDoc(doc(db, "game", "live_state"), { 
+                    status: "crashed", 
+                    target,
+                    purse: newPurse 
+                });
+                
+                await updateDoc(doc(db, "game", "aviator_sequence"), { currentIndex: d.currentIndex + 1 });
+                setTimeout(runCycle, 3000);
+            } else {
+                await updateDoc(doc(db, "game", "live_state"), { current: m });
+            }
+        }, 100); 
+    }, 5000);
+}
+
+window.resetPurse = async () => {
+    if(confirm("Clear Admin Purse to 0?")) {
+        await updateDoc(doc(db, "game", "live_state"), { purse: 0 });
+    }
+};
+
+// ... REST OF YOUR EXISTING ADMIN FUNCTIONS (generateAutoSequence, saveSequence, user management, etc.) ...
+
+window.generateAutoSequence = () => {
+    let rounds = [];
+    for(let i=0; i<50; i++) {
+        let rand = Math.random();
+        let val = rand < 0.4 ? (Math.random() * 0.8 + 1.1) : (rand < 0.8 ? (Math.random() * 3 + 2) : (Math.random() * 15 + 5));
+        rounds.push(val.toFixed(2));
+    }
+    document.getElementById('seq-input').value = rounds.join(', ');
+};
+
+window.saveSequence = async () => {
+    const arr = document.getElementById('seq-input').value.split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
+    await setDoc(doc(db, "game", "aviator_sequence"), { multipliers: arr, currentIndex: 0 });
+    alert("Saved!");
+};
+
+onSnapshot(collection(db, "users"), snap => {
+    const list = document.getElementById('user-list');
+    let totalBal = 0; let count = 0; list.innerHTML = "";
+    snap.forEach(ds => {
+        const u = ds.data(); count++; totalBal += (u.balance || 0);
+        list.innerHTML += `<div class="list-item ${u.status === 'banned' ? 'banned' : ''}">
+            <div style="display:flex; justify-content:space-between;"><b>${u.name}</b> <b style="color:var(--gold)">₦${u.balance.toFixed(2)}</b></div>
+            <div class="user-controls">
+                <button class="btn btn-blue" style="padding:8px" onclick="deductBal('${ds.id}', ${u.balance})">Deduct</button>
+                <button class="btn btn-red" style="padding:8px" onclick="toggleBlock('${ds.id}', '${u.status}')">Block</button>
+            </div>
+        </div>`;
+    });
+    document.getElementById('total-users').innerText = count;
+    document.getElementById('total-funds').innerText = "₦" + totalBal.toLocaleString();
+});
+
+window.deductBal = async (id, cur) => {
+    const val = prompt("Amount to DEDUCT:");
+    if(val) await updateDoc(doc(db, "users", id), { balance: cur - Number(val) });
+};
+
+window.toggleBlock = async (id, stat) => {
+    await updateDoc(doc(db, "users", id), { status: stat === 'banned' ? 'active' : 'banned' });
+};
+
+onSnapshot(query(collection(db, "transactions"), where("status", "==", "pending")), snap => {
+    const list = document.getElementById('trans-list'); list.innerHTML = "";
+    snap.forEach(ds => {
+        const t = ds.data();
+        list.innerHTML += `<div class="list-item">
+            <div><b>${t.type.toUpperCase()}</b> | ₦${t.amount}</div>
+            <button onclick="approve('${ds.id}','${t.uid}',${t.amount},'${t.type}')" class="btn btn-green" style="padding:5px; margin-top:5px;">Approve</button>
+        </div>`;
+    });
+});
+
+window.approve = async (id, uid, amt, type) => {
+    if (type === 'deposit') {
+        const uSnap = await getDoc(doc(db, "users", uid));
+        await updateDoc(doc(db, "users", uid), { balance: (uSnap.data().balance || 0) + amt });
+    }
+    await updateDoc(doc(db, "transactions", id), { status: "approved" });
+};
+
+onSnapshot(doc(db, "game", "aviator_sequence"), snap => {
+    if (snap.exists()) {
+        const d = snap.data();
+        document.getElementById('idx-view').innerText = (d.currentIndex % d.multipliers.length) + 1 + " of " + d.multipliers.length;
+        document.getElementById('next-view').innerText = d.multipliers[d.currentIndex % d.multipliers.length].toFixed(2) + "x";
+    }
+});
+</script>
+</body>
+</html>
